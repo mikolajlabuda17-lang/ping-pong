@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Teardown Lite Installer
+Comment=Instaluje mini grę (kopiuje binarkę do folderu bin/)
+Exec=bash -lc 'ROOT_DIR="$(dirname \"$(readlink -f %k)\")"; bash "$ROOT_DIR/install.sh" "$ROOT_DIR"'
+Terminal=true
+Categories=Game;
