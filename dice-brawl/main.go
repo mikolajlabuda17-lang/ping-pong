@@ -6,6 +6,7 @@ import (
     "log"
     "math"
     "math/rand"
+    "net/http"
     "os"
     "os/exec"
     "path/filepath"
@@ -418,7 +419,7 @@ func (g *Game) handleModButton() {
         // WWW
         wr := g.webButtonRect()
         if float64(mx) >= wr.pos.x && float64(mx) <= wr.pos.x+wr.size.x && float64(my) >= wr.pos.y && float64(my) <= wr.pos.y+wr.size.y {
-            _ = exec.Command("xdg-open", "https://dice-brawlmods/").Start()
+            g.openModsSite()
             return
         }
         // MOD
@@ -428,6 +429,19 @@ func (g *Game) handleModButton() {
             return
         }
     }
+}
+
+func (g *Game) openModsSite() {
+    url := "https://dice-brawlmods/"
+    client := &http.Client{Timeout: 1500 * time.Millisecond}
+    if resp, err := client.Get(url); err == nil && resp.StatusCode >= 200 && resp.StatusCode < 400 {
+        _ = exec.Command("xdg-open", url).Start()
+        return
+    }
+    // fallback to local installed html
+    home, _ := os.UserHomeDir()
+    local := filepath.Join(home, ".local/share/dice-brawl/web/mods.html")
+    _ = exec.Command("xdg-open", local).Start()
 }
 
 func (g *Game) tryOpenModDialog() {

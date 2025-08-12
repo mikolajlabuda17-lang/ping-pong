@@ -6,8 +6,10 @@ APP_ID="dice-brawl"
 INSTALL_BIN_DIR="$HOME/.local/games"
 INSTALL_APP_DIR="$HOME/.local/share/applications"
 INSTALL_ICON_DIR="$HOME/.local/share/icons/hicolor/256x256/apps"
+DATA_DIR="$HOME/.local/share/dice-brawl"
+WEB_DIR="$DATA_DIR/web"
 
-mkdir -p "$INSTALL_BIN_DIR" "$INSTALL_APP_DIR" "$INSTALL_ICON_DIR"
+mkdir -p "$INSTALL_BIN_DIR" "$INSTALL_APP_DIR" "$INSTALL_ICON_DIR" "$WEB_DIR"
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
 PKG_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
@@ -18,6 +20,11 @@ install -m 0755 "$PKG_ROOT/bin/dice-brawl" "$INSTALL_BIN_DIR/dice-brawl"
 # Icon (optional placeholder)
 if [[ -f "$PKG_ROOT/icon.png" ]]; then
   install -m 0644 "$PKG_ROOT/icon.png" "$INSTALL_ICON_DIR/${APP_ID}.png"
+fi
+
+# Web content
+if [[ -d "$PKG_ROOT/web" ]]; then
+  rsync -a --delete "$PKG_ROOT/web/" "$WEB_DIR/" 2>/dev/null || cp -a "$PKG_ROOT/web/." "$WEB_DIR/"
 fi
 
 # Desktop entry
