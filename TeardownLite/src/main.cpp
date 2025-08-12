@@ -7,6 +7,9 @@
 #include <sstream>
 #include <algorithm>
 #include <functional>
+#include <cstdlib>
+#include <sys/stat.h>
+#include <sys/types.h>
 
 // Very small 2D voxel-like heist game inspired by destruction sandbox mechanics.
 // No external assets; no text rendering. UI is represented by simple shapes.
@@ -78,8 +81,32 @@ struct Progression { int score=0; bool extinguisherUnlocked=false; };
 
 static void drawRect(SDL_Renderer *r, int x, int y, int w, int h, SDL_Color c){ SDL_SetRenderDrawColor(r,c.r,c.g,c.b,c.a); SDL_Rect rc{ x,y,w,h }; SDL_RenderFillRect(r,&rc);} 
 
-static bool loadProgress(const std::string &p, Progression &o){ std::ifstream in(p); if(!in.is_open()) return false; std::string l; while(std::getline(in,l)){ if(l.rfind("score=",0)==0) o.score=std::stoi(l.substr(6)); if(l.rfind("extinguisher_unlocked=",0)==0) o.extinguisherUnlocked=(l.substr(23)=="1"); } return true; }
-static void saveProgress(const std::string &p, const Progression &s){ std::ofstream out(p,std::ios::trunc); out<<"score="<<s.score<<"\n"<<"extinguisher_unlocked="<<(s.extinguisherUnlocked?1:0)<<"\n"; }
+static std::string getUserDataDir() {
+    const char* xdg = std::getenv("XDG_DATA_HOME");
+    std::string base = xdg && *xdg ? xdg : (std::getenv("HOME") ? std::string(std::getenv("HOME")) + "/.local/share" : std::string("./"));
+    std::string path = base + "/teardown-2d";
+    mkdir(path.c_str(), 0755);
+    return path;
+}
+
+static bool loadProgressSafe(Progression &out) {
+    std::string dir = getUserDataDir();
+    std::ifstream in(dir + "/save.txt");
+    if (!in.is_open()) return false;
+    std::string line;
+    while (std::getline(in, line)) {
+        if (line.rfind("score=", 0) == 0) out.score = std::stoi(line.substr(6));
+        if (line.rfind("extinguisher_unlocked=", 0) == 0) out.extinguisherUnlocked = (line.substr(23) == "1");
+    }
+    return true;
+}
+
+static void saveProgressSafe(const Progression &p) {
+    std::string dir = getUserDataDir();
+    std::ofstream out(dir + "/save.txt", std::ios::trunc);
+    out << "score=" << p.score << "\n";
+    out << "extinguisher_unlocked=" << (p.extinguisherUnlocked ? 1 : 0) << "\n";
+}
 
 static bool isSolidAtPixel(const Grid &g,int px,int py){ int cx=px/g.cellSize, cy=py/g.cellSize; if(!g.inBounds(cx,cy)) return true; CellType t=g.cells[cy*g.cols+cx]; return (t==CellType::Solid); }
 
@@ -105,7 +132,7 @@ int main(int argc,char**argv){ (void)argc;(void)argv; if(SDL_Init(SDL_INIT_VIDEO
 
     Grid g(cols,rows,cellSize); g.fillSolidFloor();
     Player pl{ windowWidth/2.0f, rows*cellSize*0.75f, 160.0f, 6 };
-    Tool tool=Tool::Hammer; int brush=2; bool running=true; Progression prog{}; loadProgress("save.txt",prog); Mission mis{}; auto last=std::chrono::steady_clock::now(); bool lmb=false; int compX=cols/2, compY=rows/3; bool computerOpen=false;
+    Tool tool=Tool::Hammer; int brush=2; bool running=true; Progression prog{}; loadProgressSafe(prog); Mission mis{}; auto last=std::chrono::steady_clock::now(); bool lmb=false; int compX=cols/2, compY=rows/3; bool computerOpen=false;
 
     // initial world
     g.buildSimpleHouseAndComputer(compX,compY);
@@ -129,7 +156,7 @@ int main(int argc,char**argv){ (void)argc;(void)argv; if(SDL_Init(SDL_INIT_VIDEO
 
         spreadFire(g);
 
-        if(mis.active && !mis.success && !mis.failed){ mis.timeLeftMs -= (int)(dt*1000.0f); collectIfOverlapping(g,pl,mis); if(mis.collectedValuables>=mis.totalValuables){ mis.success=true; mis.active=false; int timeBonus=std::max(0,mis.timeLeftMs/1000); int gained=mis.totalValuables*100+timeBonus; prog.score+=gained; if(!prog.extinguisherUnlocked && prog.score>=300) prog.extinguisherUnlocked=true; saveProgress("save.txt",prog);} else if(mis.timeLeftMs<=0){ mis.failed=true; mis.active=false; } }
+        if(mis.active && !mis.success && !mis.failed){ mis.timeLeftMs -= (int)(dt*1000.0f); collectIfOverlapping(g,pl,mis); if(mis.collectedValuables>=mis.totalValuables){ mis.success=true; mis.active=false; int timeBonus=std::max(0,mis.timeLeftMs/1000); int gained=mis.totalValuables*100+timeBonus; prog.score+=gained; if(!prog.extinguisherUnlocked && prog.score>=300) prog.extinguisherUnlocked=true; saveProgressSafe(prog);} else if(mis.timeLeftMs<=0){ mis.failed=true; mis.active=false; } }
 
         SDL_SetRenderDrawColor(ren,18,18,22,255); SDL_RenderClear(ren);
         drawGrid(ren,g);

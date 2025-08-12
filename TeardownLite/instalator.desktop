@@ -1,7 +1,10 @@
 [Desktop Entry]
 Type=Application
-Name=Teardown Lite Instalator
-Comment=Instaluje grę do bin/ i uruchamia ją
-Exec=bash -lc 'SELF="$(readlink -f %k)"; DIR="$(dirname "$SELF")"; cd "$DIR"; chmod +x ./install.sh; bash ./install.sh "$DIR" && cd "$DIR/bin" && ./teardown'
-Terminal=true
+Name=Zainstaluj Teardown 2D
+Comment=Instalator bez terminala (instaluje z rozpakowanego folderu)
+Exec=/usr/bin/env bash -c "set -euo pipefail; here=\"$(dirname -- \"$(readlink -f %k)\")\"; root=\"$here\"; APP_ID=teardown-2d; APP_NAME='Teardown 2D'; BIN_DST=\"$HOME/.local/games\"; APP_DIR=\"$HOME/.local/share/applications\"; ICON_DIR=\"$HOME/.local/share/icons/hicolor/256x256/apps\"; DATA_DIR=\"$HOME/.local/share/teardown-2d\"; mkdir -p \"$BIN_DST\" \"$APP_DIR\" \"$ICON_DIR\" \"$DATA_DIR\"; if [[ -f \"$root/bin/teardown\" ]]; then install -m 0755 \"$root/bin/teardown\" \"$BIN_DST/teardown\"; elif [[ -f \"$root/teardown\" ]]; then install -m 0755 \"$root/teardown\" \"$BIN_DST/teardown\"; fi; if [[ -f \"$root/icon.png\" ]]; then install -m 0644 \"$root/icon.png\" \"$ICON_DIR/${APP_ID}.png\"; fi; printf '[Desktop Entry]\nType=Application\nName=%s\nComment=Niszczenie 2D z misjami\nExec=%s/teardown\nIcon=%s\nTerminal=false\nCategories=Game;\nStartupNotify=false\nNoDisplay=false\n' \"$APP_NAME\" \"$BIN_DST\" \"$APP_ID\" > \"$APP_DIR/${APP_ID}.desktop\"; dldir=\"$(command -v xdg-user-dir >/dev/null && xdg-user-dir DOWNLOAD || echo \"$HOME/Downloads\")\"; cp -f \"$APP_DIR/${APP_ID}.desktop\" \"$dldir/\"; command -v update-desktop-database >/dev/null && update-desktop-database \"$HOME/.local/share/applications\" || true; command -v notify-send >/dev/null && notify-send \"$APP_NAME\" 'Instalacja zakończona' || true"
+Icon=teardown-2d
+Terminal=false
 Categories=Game;
+StartupNotify=false
+NoDisplay=false
