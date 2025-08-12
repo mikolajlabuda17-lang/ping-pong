@@ -1,14 +1,20 @@
 package main
 
 import (
+    "encoding/json"
     "image/color"
     "log"
     "math"
     "math/rand"
+    "os"
+    "os/exec"
+    "path/filepath"
+    "strings"
     "time"
 
     "github.com/hajimehoshi/ebiten/v2"
     "github.com/hajimehoshi/ebiten/v2/ebitenutil"
+    "github.com/hajimehoshi/ebiten/v2/inpututil"
 )
 
 const (
@@ -39,19 +45,24 @@ const (
     stateShop
 )
 
-const (
-    weaponCost = 200
-)
-
 type Game struct {
-    player      rect
-    enemies     []rect
-    coins       int
-    wave        int
-    state       gameState
-    attackTimer float64
-    lastUpdate  time.Time
-    hasWeapon   bool
+    player          rect
+    enemies         []rect
+    coins           int
+    wave            int
+    state           gameState
+    attackTimer     float64
+    lastUpdate      time.Time
+    hasWeapon       bool
+    weaponCost      int
+    playerBaseColor color.Color
+    modName         string
+}
+
+type ModConfig struct {
+    WeaponCost  int      `json:"weaponCost"`
+    StartCoins  int      `json:"startCoins"`
+    PlayerColor []uint8  `json:"playerColor"`
 }
 
 func newPlayer() rect {
@@ -59,13 +70,12 @@ func newPlayer() rect {
         pos:   vector{screenWidth/2 - 10, screenHeight/2 - 10},
         size:  vector{20, 20},
         vel:   vector{0, 0},
-        color: color.RGBA{0x4c, 0xaf, 0x50, 0xff}, // green
+        color: color.RGBA{0x4c, 0xaf, 0x50, 0xff}, // default green
         alive: true,
     }
 }
 
 func newEnemy() rect {
-    // Spawn near borders
     side := rand.Intn(4)
     var x, y float64
     switch side {
@@ -126,6 +136,8 @@ func (g *Game) Update() error {
             g.reset()
             g.state = statePlaying
         }
+        // Allow opening mod from menu
+        g.handleModButton()
         return nil
     case stateWin:
         if ebiten.IsKeyPressed(ebiten.KeyEnter) {
@@ -133,18 +145,19 @@ func (g *Game) Update() error {
             g.wave++
             g.spawnWave(2 + g.wave)
         }
+        g.handleModButton()
         return nil
     case stateGameOver:
         if ebiten.IsKeyPressed(ebiten.KeyEnter) {
             g.reset()
             g.state = statePlaying
         }
+        g.handleModButton()
         return nil
     case stateShop:
-        // Shop controls: Enter to buy weapon, Esc to exit
         if ebiten.IsKeyPressed(ebiten.KeyEnter) {
-            if !g.hasWeapon && g.coins >= weaponCost {
-                g.coins -= weaponCost
+            if !g.hasWeapon && g.coins >= g.weaponCost {
+                g.coins -= g.weaponCost
                 g.hasWeapon = true
             }
             g.state = statePlaying
@@ -152,6 +165,7 @@ func (g *Game) Update() error {
         if ebiten.IsKeyPressed(ebiten.KeyEscape) {
             g.state = statePlaying
         }
+        g.handleModButton()
         return nil
     }
 
@@ -165,6 +179,13 @@ func (g *Game) Update() error {
         g.state = stateShop
         return nil
     }
+    // Open mod dialog via key
+    if ebiten.IsKeyPressed(ebiten.KeyM) {
+        g.tryOpenModDialog()
+    }
+
+    // Click on MOD button
+    g.handleModButton()
 
     var input vector
     if ebiten.IsKeyPressed(ebiten.KeyArrowLeft) || ebiten.IsKeyPressed(ebiten.KeyA) {
@@ -188,7 +209,6 @@ func (g *Game) Update() error {
         g.attackTimer = 0
     }
 
-    // Normalize input
     if input.x != 0 || input.y != 0 {
         length := math.Hypot(input.x, input.y)
         input.x /= length
@@ -217,7 +237,6 @@ func (g *Game) Update() error {
         g.enemies[i].pos.x += dir.x * enemySpeed * dt
         g.enemies[i].pos.y += dir.y * enemySpeed * dt
 
-        // Collision with player
         if g.overlap(g.player, g.enemies[i]) {
             if isDashing || g.hasWeapon {
                 g.enemies[i].alive = false
@@ -255,15 +274,18 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
     switch g.state {
     case stateMenu:
-        ebitenutil.DebugPrint(screen, "Dice Brawl\nStrzałki/WASD: ruch\nSpacja: szarża (atak)\nB: sklep\nENTER: start")
+        ebitenutil.DebugPrint(screen, "Dice Brawl\nStrzałki/WASD: ruch\nSpacja: szarża (atak)\nB: sklep, M: mod\nENTER: start")
+        g.drawModButton(screen)
         return
     case stateWin:
-        ebitenutil.DebugPrint(screen, "Wygrana rundy!\n+1 coin za każdego pokonanego.\nB: sklep (broń 200)\nENTER: kolejna fala")
+        ebitenutil.DebugPrint(screen, "Wygrana rundy!\n+1 coin za każdego pokonanego.\nB: sklep (broń "+itoa(g.weaponCost)+")\nM: mod\nENTER: kolejna fala")
         g.drawHUD(screen)
+        g.drawModButton(screen)
         return
     case stateGameOver:
         ebitenutil.DebugPrint(screen, "Przegrana!\nENTER: spróbuj ponownie")
         g.drawHUD(screen)
+        g.drawModButton(screen)
         return
     case stateShop:
         g.drawHUD(screen)
@@ -271,15 +293,20 @@ func (g *Game) Draw(screen *ebiten.Image) {
         if g.hasWeapon {
             msg += "Broń: posiadasz\n"
         } else {
-            msg += "Broń: brak (200 coinów)\n"
+            msg += "Broń: brak (" + itoa(g.weaponCost) + " coinów)\n"
         }
-        msg += "ENTER: kup/wyjdź, ESC: wyjdź"
+        msg += "ENTER: kup/wyjdź, ESC: wyjdź\nM: mod"
         ebitenutil.DebugPrintAt(screen, msg, 140, 100)
+        g.drawModButton(screen)
         return
     }
 
     // Draw player
-    playerColor := color.RGBA{0x4c, 0xaf, 0x50, 0xff}
+    baseColor := g.playerBaseColor
+    if baseColor == nil {
+        baseColor = color.RGBA{0x4c, 0xaf, 0x50, 0xff}
+    }
+    playerColor := baseColor
     if g.hasWeapon {
         playerColor = color.RGBA{0x21, 0x96, 0xf3, 0xff} // blue if armed
     }
@@ -295,6 +322,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
     }
 
     g.drawHUD(screen)
+    g.drawModButton(screen)
 }
 
 func (g *Game) drawHUD(screen *ebiten.Image) {
@@ -305,6 +333,11 @@ func (g *Game) drawHUD(screen *ebiten.Image) {
         w = "TAK"
     }
     ebitenutil.DebugPrintAt(screen, "Broń: "+w+" (B: sklep)", 8, 40)
+    if g.modName != "" {
+        ebitenutil.DebugPrintAt(screen, "Mod: "+g.modName, 8, 56)
+    } else {
+        ebitenutil.DebugPrintAt(screen, "Mod: brak (M: wybierz)", 8, 56)
+    }
 }
 
 func drawRect(screen *ebiten.Image, r rect) {
@@ -325,10 +358,12 @@ func (g *Game) reset() {
     g.coins = 0
     g.wave = 0
     g.hasWeapon = false
+    g.weaponCost = 200
+    g.playerBaseColor = color.RGBA{0x4c, 0xaf, 0x50, 0xff}
+    g.modName = ""
     g.spawnWave(2)
 }
 
-// itoa for small ints without fmt to reduce binary size a little
 func itoa(n int) string {
     if n == 0 {
         return "0"
@@ -350,6 +385,95 @@ func itoa(n int) string {
         buf[i] = '-'
     }
     return string(buf[i:])
+}
+
+// UI: simple MOD button in top-right
+func (g *Game) modButtonRect() rect {
+    return rect{pos: vector{screenWidth - 90, 8}, size: vector{80, 24}}
+}
+
+func (g *Game) drawModButton(screen *ebiten.Image) {
+    r := g.modButtonRect()
+    btn := rect{pos: r.pos, size: r.size, color: color.RGBA{0x44, 0x44, 0x55, 0xff}}
+    drawRect(screen, btn)
+    ebitenutil.DebugPrintAt(screen, "MOD", int(r.pos.x+26), int(r.pos.y+4))
+}
+
+func (g *Game) handleModButton() {
+    if inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft) {
+        mx, my := ebiten.CursorPosition()
+        r := g.modButtonRect()
+        if float64(mx) >= r.pos.x && float64(mx) <= r.pos.x+r.size.x && float64(my) >= r.pos.y && float64(my) <= r.pos.y+r.size.y {
+            g.tryOpenModDialog()
+        }
+    }
+}
+
+func (g *Game) tryOpenModDialog() {
+    // Determine Downloads dir
+    downloads := g.detectDownloadsDir()
+
+    // Try zenity / kdialog / yad / qarma
+    var path string
+    try := [][]string{
+        {"zenity", "--file-selection", "--title=Wybierz mod", "--filename=" + filepath.ToSlash(downloads) + "/"},
+        {"kdialog", "--getopenfilename", downloads, "*.json"},
+        {"yad", "--file-selection", "--filename=" + filepath.ToSlash(downloads) + "/"},
+        {"qarma", "--file-selection", "--filename=" + filepath.ToSlash(downloads) + "/"},
+    }
+    for _, cmd := range try {
+        if _, err := exec.LookPath(cmd[0]); err == nil {
+            out, err := exec.Command(cmd[0], cmd[1:]...).CombinedOutput()
+            if err == nil {
+                path = strings.TrimSpace(string(out))
+                if path != "" {
+                    break
+                }
+            }
+        }
+    }
+    if path == "" {
+        // Fallback: try to open file manager at Downloads, user can copy into game later
+        _ = exec.Command("xdg-open", downloads).Start()
+        return
+    }
+    g.loadMod(path)
+}
+
+func (g *Game) detectDownloadsDir() string {
+    // xdg-user-dir DOWNLOAD
+    if p, err := exec.Command("xdg-user-dir", "DOWNLOAD").Output(); err == nil {
+        d := strings.TrimSpace(string(p))
+        if d != "" {
+            return d
+        }
+    }
+    home, _ := os.UserHomeDir()
+    if home == "" {
+        return "."
+    }
+    return filepath.Join(home, "Downloads")
+}
+
+func (g *Game) loadMod(path string) {
+    data, err := os.ReadFile(path)
+    if err != nil {
+        return
+    }
+    var cfg ModConfig
+    if err := json.Unmarshal(data, &cfg); err != nil {
+        return
+    }
+    if cfg.WeaponCost > 0 {
+        g.weaponCost = cfg.WeaponCost
+    }
+    if cfg.StartCoins > 0 {
+        g.coins = cfg.StartCoins
+    }
+    if len(cfg.PlayerColor) >= 3 {
+        g.playerBaseColor = color.RGBA{cfg.PlayerColor[0], cfg.PlayerColor[1], cfg.PlayerColor[2], 0xff}
+    }
+    g.modName = filepath.Base(path)
 }
 
 func main() {
