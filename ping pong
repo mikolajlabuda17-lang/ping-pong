@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Pong – prosta gra w HTML</title>
+  <style>
+    :root { color-scheme: dark; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      background: #0f1115;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+      color: #e6e6e6;
+    }
+    .wrap {
+      display: grid;
+      gap: 12px;
+      place-items: center;
+    }
+    canvas {
+      background: radial-gradient(1200px 500px at 50% 50%, #18202b 0%, #0f1115 70%);
+      width: min(92vw, 900px);
+      height: auto;
+      aspect-ratio: 16/10;
+      border: 2px solid #1f2a37;
+      border-radius: 12px;
+      box-shadow: 0 10px 30px rgba(0,0,0,.35), inset 0 0 0 1px rgba(255,255,255,.03);
+    }
+    .info {
+      opacity: .9;
+      font-size: 14px;
+      text-align: center;
+    }
+    .kbd {
+      padding: 2px 6px;
+      border: 1px solid #394553;
+      border-bottom-width: 2px;
+      border-radius: 6px;
+      background: #151a21;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.06);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 13px;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <canvas id="game" width="960" height="600" aria-label="Pong"></canvas>
+    <div class="info">
+      Sterowanie: <span class="kbd">W</span>/<span class="kbd">S</span> lub <span class="kbd">↑</span>/<span class="kbd">↓</span> •
+      <span class="kbd">Spacja</span> start/pauza • Do 10 punktów
+    </div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById("game");
+    const ctx = canvas.getContext("2d");
+
+    const FIELD = { width: canvas.width, height: canvas.height };
+    const NET_COLOR = "#3a4656";
+    const PADDLE_COLOR = "#dbe2ea";
+    const BALL_COLOR = "#e5f2ff";
+    const TEXT_COLOR = "#c7d1dd";
+    const MAX_SCORE = 10;
+
+    const paddle = {
+      width: 14,
+      height: 110,
+      margin: 22,
+      speed: 7
+    };
+
+    const ball = {
+      x: FIELD.width / 2,
+      y: FIELD.height / 2,
+      radius: 9,
+      speed: 5.2,
+      vx: 5.2,
+      vy: 0
+    };
+
+    const player = {
+      x: paddle.margin,
+      y: FIELD.height / 2 - paddle.height / 2,
+      score: 0,
+      up: false,
+      down: false
+    };
+
+    const ai = {
+      x: FIELD.width - paddle.margin - paddle.width,
+      y: FIELD.height / 2 - paddle.height / 2,
+      score: 0,
+      reaction: 0.11, // 0..1 (im szybciej tym trudniej)
+      maxSpeed: 6.4
+    };
+
+    let isPaused = true;
+    let showTip = true;
+
+    function clamp(value, min, max) {
+      return Math.max(min, Math.min(max, value));
+    }
+
+    function resetBall(direction = Math.random() < 0.5 ? -1 : 1) {
+      ball.x = FIELD.width / 2;
+      ball.y = FIELD.height / 2;
+      ball.speed = 5.2;
+      const angle = (Math.random() * 0.6 - 0.3); // ~(-17°..17°)
+      ball.vx = direction * ball.speed * Math.cos(angle);
+      ball.vy = ball.speed * Math.sin(angle);
+    }
+
+    function drawNet() {
+      ctx.save();
+      ctx.strokeStyle = NET_COLOR;
+      ctx.lineWidth = 4;
+      ctx.setLineDash([12, 16]);
+      ctx.beginPath();
+      ctx.moveTo(FIELD.width / 2, 30);
+      ctx.lineTo(FIELD.width / 2, FIELD.height - 30);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    function drawPaddle(x, y) {
+      const r = 8;
+      ctx.fillStyle = PADDLE_COLOR;
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.lineTo(x + paddle.width - r, y);
+      ctx.quadraticCurveTo(x + paddle.width, y, x + paddle.width, y + r);
+      ctx.lineTo(x + paddle.width, y + paddle.height - r);
+      ctx.quadraticCurveTo(x + paddle.width, y + paddle.height, x + paddle.width - r, y + paddle.height);
+      ctx.lineTo(x + r, y + paddle.height);
+      ctx.quadraticCurveTo(x, y + paddle.height, x, y + paddle.height - r);
+      ctx.lineTo(x, y + r);
+      ctx.quadraticCurveTo(x, y, x + r, y);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    function drawBall() {
+      ctx.fillStyle = BALL_COLOR;
+      ctx.beginPath();
+      ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    function drawScore() {
+      ctx.fillStyle = TEXT_COLOR;
+      ctx.font = "bold 48px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto";
+      ctx.textAlign = "center";
+      ctx.fillText(player.score, FIELD.width / 2 - 60, 64);
+      ctx.fillText(ai.score, FIELD.width / 2 + 60, 64);
+    }
+
+    function drawOverlay(text, subtext) {
+      ctx.fillStyle = "rgba(0,0,0,0.35)";
+      ctx.fillRect(0, 0, FIELD.width, FIELD.height);
+
+      ctx.fillStyle = TEXT_COLOR;
+      ctx.textAlign = "center";
+      ctx.font = "600 40px ui-sans-serif, system-ui";
+      ctx.fillText(text, FIELD.width / 2, FIELD.height / 2 - 10);
+
+      if (subtext) {
+        ctx.font = "16px ui-sans-serif, system-ui";
+        ctx.fillText(subtext, FIELD.width / 2, FIELD.height / 2 + 26);
+      }
+    }
+
+    function handleInput() {
+      if (player.up) player.y -= paddle.speed;
+      if (player.down) player.y += paddle.speed;
+      player.y = clamp(player.y, 0, FIELD.height - paddle.height);
+    }
+
+    function updateAI() {
+      const targetY = ball.y - paddle.height / 2;
+      const delta = targetY - ai.y;
+      const step = clamp(delta * ai.reaction, -ai.maxSpeed, ai.maxSpeed);
+      ai.y = clamp(ai.y + step, 0, FIELD.height - paddle.height);
+    }
+
+    function updateBall() {
+      ball.x += ball.vx;
+      ball.y += ball.vy;
+
+      // Odbicie od ścian góra/dół
+      if (ball.y - ball.radius <= 0 && ball.vy < 0) {
+        ball.y = ball.radius;
+        ball.vy = -ball.vy;
+      }
+      if (ball.y + ball.radius >= FIELD.height && ball.vy > 0) {
+        ball.y = FIELD.height - ball.radius;
+        ball.vy = -ball.vy;
+      }
+
+      // Kolizja z lewą paletką (gracz)
+      if (ball.x - ball.radius <= player.x + paddle.width &&
+          ball.x > player.x &&
+          ball.y >= player.y &&
+          ball.y <= player.y + paddle.height &&
+          ball.vx < 0) {
+        const hitPos = (ball.y - (player.y + paddle.height / 2)) / (paddle.height / 2);
+        const angle = hitPos * (Math.PI / 3.5); // max ~51°
+        ball.speed = Math.min(ball.speed + 0.45, 13);
+        ball.vx = Math.abs(ball.speed * Math.cos(angle));
+        ball.vy = ball.speed * Math.sin(angle);
+        ball.x = player.x + paddle.width + ball.radius + 0.5;
+      }
+
+      // Kolizja z prawą paletką (AI)
+      if (ball.x + ball.radius >= ai.x &&
+          ball.x < ai.x + paddle.width &&
+          ball.y >= ai.y &&
+          ball.y <= ai.y + paddle.height &&
+          ball.vx > 0) {
+        const hitPos = (ball.y - (ai.y + paddle.height / 2)) / (paddle.height / 2);
+        const angle = hitPos * (Math.PI / 3.5);
+        ball.speed = Math.min(ball.speed + 0.45, 13);
+        ball.vx = -Math.abs(ball.speed * Math.cos(angle));
+        ball.vy = ball.speed * Math.sin(angle);
+        ball.x = ai.x - ball.radius - 0.5;
+      }
+
+      // Punkty
+      if (ball.x + ball.radius < 0) {
+        ai.score += 1;
+        isPaused = true;
+        showTip = false;
+        if (ai.score >= MAX_SCORE) {
+          drawFrame();
+          drawOverlay("Koniec gry! Wygrała prawa strona (AI).", "Naciśnij Spację aby zagrać ponownie.");
+          player.score = 0;
+          ai.score = 0;
+        }
+        resetBall(1);
+      }
+
+      if (ball.x - ball.radius > FIELD.width) {
+        player.score += 1;
+        isPaused = true;
+        showTip = false;
+        if (player.score >= MAX_SCORE) {
+          drawFrame();
+          drawOverlay("Koniec gry! Wygrałeś!", "Naciśnij Spację aby zagrać ponownie.");
+          player.score = 0;
+          ai.score = 0;
+        }
+        resetBall(-1);
+      }
+    }
+
+    function drawFrame() {
+      ctx.clearRect(0, 0, FIELD.width, FIELD.height);
+      drawNet();
+      drawPaddle(player.x, player.y);
+      drawPaddle(ai.x, ai.y);
+      drawBall();
+      drawScore();
+
+      if (isPaused) {
+        const tip = showTip
+          ? "Wciśnij Spację, aby rozpocząć • W/S lub ↑/↓ poruszają paletką"
+          : "Spacja: wznowienie • W/S lub ↑/↓ poruszają paletką";
+        drawOverlay("Pauza", tip);
+      }
+    }
+
+    function loop() {
+      if (!isPaused) {
+        handleInput();
+        updateAI();
+        updateBall();
+      }
+      drawFrame();
+      requestAnimationFrame(loop);
+    }
+
+    // Wejście z klawiatury
+    window.addEventListener("keydown", (e) => {
+      if (["ArrowUp", "ArrowDown", " "].includes(e.key)) e.preventDefault();
+      if (e.key === "w" || e.key === "W" || e.key === "ArrowUp") player.up = true;
+      if (e.key === "s" || e.key === "S" || e.key === "ArrowDown") player.down = true;
+      if (e.key === " ") {
+        isPaused = !isPaused;
+        showTip = false;
+      }
+    });
+
+    window.addEventListener("keyup", (e) => {
+      if (["ArrowUp", "ArrowDown"].includes(e.key)) e.preventDefault();
+      if (e.key === "w" || e.key === "W" || e.key === "ArrowUp") player.up = false;
+      if (e.key === "s" || e.key === "S" || e.key === "ArrowDown") player.down = false;
+    });
+
+    // Start
+    resetBall();
+    loop();
+  </script>
+</body>
+</html>
