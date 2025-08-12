@@ -2,6 +2,6 @@
 Type=Application
 Name=Teardown Lite Instalator
 Comment=Instaluje grę do bin/ i uruchamia ją
-Exec=bash -lc 'SELF="$(readlink -f %k)"; DIR="$(dirname "$SELF")"; cd "$DIR"; chmod +x ./install.sh; bash ./install.sh "$DIR" && cd "$DIR/bin" && ./teardown-lite'
+Exec=bash -lc 'SELF="$(readlink -f %k)"; DIR="$(dirname "$SELF")"; cd "$DIR"; chmod +x ./install.sh; bash ./install.sh "$DIR" && cd "$DIR/bin" && ./teardown'
 Terminal=true
 Categories=Game;

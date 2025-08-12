@@ -1,4 +1,4 @@
-APP_NAME=teardown-lite
+APP_NAME=teardown
 CXX?=g++
 CXXFLAGS?=-O2 -Wall -Wextra -std=c++17 $(shell sdl2-config --cflags)
 LDFLAGS?=$(shell sdl2-config --libs)
