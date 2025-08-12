@@ -352,6 +352,11 @@ func (g *Game) Layout(outsideWidth, outsideHeight int) (int, int) {
     return screenWidth, screenHeight
 }
 
+// UI: simple MOD button in top-right
+func (g *Game) modButtonRect() rect {
+    return rect{pos: vector{screenWidth - 90, 8}, size: vector{80, 24}}
+}
+
 func (g *Game) reset() {
     g.player = newPlayer()
     g.enemies = nil
@@ -364,6 +369,7 @@ func (g *Game) reset() {
     g.spawnWave(2)
 }
 
+// itoa for small ints without fmt to reduce binary size a little
 func itoa(n int) string {
     if n == 0 {
         return "0"
@@ -387,12 +393,19 @@ func itoa(n int) string {
     return string(buf[i:])
 }
 
-// UI: simple MOD button in top-right
-func (g *Game) modButtonRect() rect {
-    return rect{pos: vector{screenWidth - 90, 8}, size: vector{80, 24}}
+// WWW button next to MOD
+func (g *Game) webButtonRect() rect {
+    return rect{pos: vector{screenWidth - 180, 8}, size: vector{80, 24}}
 }
 
 func (g *Game) drawModButton(screen *ebiten.Image) {
+    // WWW button
+    wr := g.webButtonRect()
+    wbtn := rect{pos: wr.pos, size: wr.size, color: color.RGBA{0x44, 0x44, 0x55, 0xff}}
+    drawRect(screen, wbtn)
+    ebitenutil.DebugPrintAt(screen, "WWW", int(wr.pos.x+24), int(wr.pos.y+4))
+
+    // MOD button
     r := g.modButtonRect()
     btn := rect{pos: r.pos, size: r.size, color: color.RGBA{0x44, 0x44, 0x55, 0xff}}
     drawRect(screen, btn)
@@ -402,9 +415,17 @@ func (g *Game) drawModButton(screen *ebiten.Image) {
 func (g *Game) handleModButton() {
     if inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft) {
         mx, my := ebiten.CursorPosition()
+        // WWW
+        wr := g.webButtonRect()
+        if float64(mx) >= wr.pos.x && float64(mx) <= wr.pos.x+wr.size.x && float64(my) >= wr.pos.y && float64(my) <= wr.pos.y+wr.size.y {
+            _ = exec.Command("xdg-open", "https://dice-brawlmods/").Start()
+            return
+        }
+        // MOD
         r := g.modButtonRect()
         if float64(mx) >= r.pos.x && float64(mx) <= r.pos.x+r.size.x && float64(my) >= r.pos.y && float64(my) <= r.pos.y+r.size.y {
             g.tryOpenModDialog()
+            return
         }
     }
 }
