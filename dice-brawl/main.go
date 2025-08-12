@@ -36,6 +36,11 @@ const (
     statePlaying
     stateWin
     stateGameOver
+    stateShop
+)
+
+const (
+    weaponCost = 200
 )
 
 type Game struct {
@@ -46,6 +51,7 @@ type Game struct {
     state       gameState
     attackTimer float64
     lastUpdate  time.Time
+    hasWeapon   bool
 }
 
 func newPlayer() rect {
@@ -134,12 +140,31 @@ func (g *Game) Update() error {
             g.state = statePlaying
         }
         return nil
+    case stateShop:
+        // Shop controls: Enter to buy weapon, Esc to exit
+        if ebiten.IsKeyPressed(ebiten.KeyEnter) {
+            if !g.hasWeapon && g.coins >= weaponCost {
+                g.coins -= weaponCost
+                g.hasWeapon = true
+            }
+            g.state = statePlaying
+        }
+        if ebiten.IsKeyPressed(ebiten.KeyEscape) {
+            g.state = statePlaying
+        }
+        return nil
     }
 
     // Controls
     moveSpeed := 120.0
     dashSpeed := 300.0
     isDashing := ebiten.IsKeyPressed(ebiten.KeySpace)
+
+    // Open shop
+    if ebiten.IsKeyPressed(ebiten.KeyB) {
+        g.state = stateShop
+        return nil
+    }
 
     var input vector
     if ebiten.IsKeyPressed(ebiten.KeyArrowLeft) || ebiten.IsKeyPressed(ebiten.KeyA) {
@@ -194,7 +219,7 @@ func (g *Game) Update() error {
 
         // Collision with player
         if g.overlap(g.player, g.enemies[i]) {
-            if isDashing {
+            if isDashing || g.hasWeapon {
                 g.enemies[i].alive = false
                 g.coins += 1
             } else {
@@ -230,20 +255,37 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
     switch g.state {
     case stateMenu:
-        ebitenutil.DebugPrint(screen, "Dice Brawl\nStrzałki/WASD: ruch\nSpacja: szarża (atak)\nENTER: start")
+        ebitenutil.DebugPrint(screen, "Dice Brawl\nStrzałki/WASD: ruch\nSpacja: szarża (atak)\nB: sklep\nENTER: start")
         return
     case stateWin:
-        ebitenutil.DebugPrint(screen, "Wygrana rundy!\n+1 coin za każdego pokonanego.\nENTER: kolejna fala")
+        ebitenutil.DebugPrint(screen, "Wygrana rundy!\n+1 coin za każdego pokonanego.\nB: sklep (broń 200)\nENTER: kolejna fala")
         g.drawHUD(screen)
         return
     case stateGameOver:
         ebitenutil.DebugPrint(screen, "Przegrana!\nENTER: spróbuj ponownie")
         g.drawHUD(screen)
         return
+    case stateShop:
+        g.drawHUD(screen)
+        msg := "SKLEP\n"
+        if g.hasWeapon {
+            msg += "Broń: posiadasz\n"
+        } else {
+            msg += "Broń: brak (200 coinów)\n"
+        }
+        msg += "ENTER: kup/wyjdź, ESC: wyjdź"
+        ebitenutil.DebugPrintAt(screen, msg, 140, 100)
+        return
     }
 
     // Draw player
-    drawRect(screen, g.player)
+    playerColor := color.RGBA{0x4c, 0xaf, 0x50, 0xff}
+    if g.hasWeapon {
+        playerColor = color.RGBA{0x21, 0x96, 0xf3, 0xff} // blue if armed
+    }
+    p := g.player
+    p.color = playerColor
+    drawRect(screen, p)
 
     // Draw enemies
     for _, e := range g.enemies {
@@ -258,6 +300,11 @@ func (g *Game) Draw(screen *ebiten.Image) {
 func (g *Game) drawHUD(screen *ebiten.Image) {
     ebitenutil.DebugPrintAt(screen, "Coins: "+itoa(g.coins), 8, 8)
     ebitenutil.DebugPrintAt(screen, "Fala: "+itoa(g.wave+1), 8, 24)
+    w := "NIE"
+    if g.hasWeapon {
+        w = "TAK"
+    }
+    ebitenutil.DebugPrintAt(screen, "Broń: "+w+" (B: sklep)", 8, 40)
 }
 
 func drawRect(screen *ebiten.Image, r rect) {
@@ -277,6 +324,7 @@ func (g *Game) reset() {
     g.enemies = nil
     g.coins = 0
     g.wave = 0
+    g.hasWeapon = false
     g.spawnWave(2)
 }
 
