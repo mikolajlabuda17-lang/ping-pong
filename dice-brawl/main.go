@@ -175,6 +175,27 @@ func (g *Game) Update() error {
     dashSpeed := 300.0
     isDashing := ebiten.IsKeyPressed(ebiten.KeySpace)
 
+    var input vector
+
+    // Android touch: first finger controls movement direction, two fingers = dash
+    touchIDs := ebiten.TouchIDs()
+    if len(touchIDs) > 0 {
+        x, y := ebiten.TouchPosition(touchIDs[0])
+        playerCenter := g.player.center()
+        dir := vector{float64(x) - playerCenter.x, float64(y) - playerCenter.y}
+        dist := math.Hypot(dir.x, dir.y)
+        if dist > 0 {
+            dir.x /= dist
+            dir.y /= dist
+        }
+        // treat touch as movement
+        input.x = dir.x
+        input.y = dir.y
+        if len(touchIDs) >= 2 {
+            isDashing = true
+        }
+    }
+
     // Open shop
     if ebiten.IsKeyPressed(ebiten.KeyB) {
         g.state = stateShop
@@ -188,7 +209,7 @@ func (g *Game) Update() error {
     // Click on MOD button
     g.handleModButton()
 
-    var input vector
+    // Keyboard/gamepad movement
     if ebiten.IsKeyPressed(ebiten.KeyArrowLeft) || ebiten.IsKeyPressed(ebiten.KeyA) {
         input.x -= 1
     }
