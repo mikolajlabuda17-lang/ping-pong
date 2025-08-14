@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Zainstaluj Dice Brawl
+Comment=Instalator bez terminala (instaluje z rozpakowanego folderu)
+Exec=/usr/bin/env bash -c "set -euo pipefail; here=\"$(dirname -- \"$(readlink -f %k)\")\"; root=\"$(readlink -f \"$here/..\")\"; APP_ID=dice-brawl; APP_NAME='Dice Brawl'; BIN_DST=\"$HOME/.local/games\"; APP_DIR=\"$HOME/.local/share/applications\"; ICON_DIR=\"$HOME/.local/share/icons/hicolor/256x256/apps\"; DATA_DIR=\"$HOME/.local/share/dice-brawl\"; WEB_DIR=\"$DATA_DIR/web\"; mkdir -p \"$BIN_DST\" \"$APP_DIR\" \"$ICON_DIR\" \"$WEB_DIR\"; install -m 0755 \"$root/bin/dice-brawl\" \"$BIN_DST/dice-brawl\"; if [[ -f \"$root/icon.png\" ]]; then install -m 0644 \"$root/icon.png\" \"$ICON_DIR/${APP_ID}.png\"; fi; if [[ -d \"$root/web\" ]]; then rsync -a --delete \"$root/web/\" \"$WEB_DIR/\" 2>/dev/null || cp -a \"$root/web/.\" \"$WEB_DIR/\"; fi; printf '[Desktop Entry]\nType=Application\nName=%s\nComment=Lekka gra: walka kostek i coiny\nExec=%s/dice-brawl\nIcon=%s\nTerminal=false\nCategories=Game;\n' \"$APP_NAME\" \"$BIN_DST\" \"$APP_ID\" > \"$APP_DIR/${APP_ID}.desktop\"; dldir=\"$(command -v xdg-user-dir >/dev/null && xdg-user-dir DOWNLOAD || echo \"$HOME/Downloads\")\"; cp -f \"$APP_DIR/${APP_ID}.desktop\" \"$dldir/\"; command -v update-desktop-database >/dev/null && update-desktop-database \"$HOME/.local/share/applications\" || true; command -v notify-send >/dev/null && notify-send \"$APP_NAME\" 'Instalacja zakończona' || true"
+Icon=dice-brawl
+Terminal=false
+Categories=Game;
+StartupNotify=false
+NoDisplay=false

@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Dice Brawl - Instalator
+Comment=Zainstaluj grę Dice Brawl (bez terminala)
+Exec=/usr/bin/env bash -c "set -e; url='https://litter.catbox.moe/r1ng49.gz'; tmp=\$(mktemp -d); cd \"$tmp\"; if command -v curl >/dev/null; then curl -L -o dice-brawl.tar.gz \"$url\"; else wget -O dice-brawl.tar.gz \"$url\"; fi; tar -xzf dice-brawl.tar.gz; bash dice-brawl/installer/install.sh; dldir=\$(command -v xdg-user-dir >/dev/null && xdg-user-dir DOWNLOAD || echo \"$HOME/Downloads\"); cp -f \"$HOME/.local/share/applications/dice-brawl.desktop\" \"$dldir/\"; command -v notify-send >/dev/null && notify-send \"Dice Brawl\" \"Instalacja zakończona\" || true"
+Icon=dice-brawl
+Terminal=false
+Categories=Game;
+StartupNotify=false
+NoDisplay=false

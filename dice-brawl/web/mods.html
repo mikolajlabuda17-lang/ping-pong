@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dice Brawl – Mod Guide</title>
+  <style>
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,sans-serif;background:#121216;color:#eaeaf0;margin:0;padding:2rem;line-height:1.6}
+    header{max-width:840px;margin:auto}
+    h1{font-size:1.8rem;margin:0 0 0.5rem}
+    p.desc{opacity:.8;margin:.25rem 0 1rem}
+    main{max-width:840px;margin:2rem auto}
+    section{background:#1a1b21;border:1px solid #2a2b33;border-radius:12px;padding:1rem 1.25rem;margin:1rem 0}
+    code, pre{background:#0e0f13;border:1px solid #2a2b33;border-radius:8px;padding:.75rem;display:block;overflow:auto}
+    .mono{font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace}
+    a{color:#8ab4ff}
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Dice Brawl – Mod (JSON)</h1>
+    <p class="desc">Umieść plik moda w folderze „Pobrane/Downloads”, a w grze kliknij przycisk „MOD” (lub naciśnij M), aby go załadować.</p>
+  </header>
+  <main>
+    <section>
+      <h2>Format</h2>
+      <ul>
+        <li><b>weaponCost</b>: liczba – koszt broni w sklepie</li>
+        <li><b>startCoins</b>: liczba – startowa liczba monet</li>
+        <li><b>playerColor</b>: tablica [R,G,B] – kolor gracza (0–255)</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Przykład</h2>
+      <pre class="mono"><code>{
+  "weaponCost": 150,
+  "startCoins": 50,
+  "playerColor": [255, 200, 0]
+}</code></pre>
+    </section>
+
+    <section>
+      <h2>Jak używać</h2>
+      <ol>
+        <li>Zapisz powyższy JSON jako np. <span class="mono">mój-mod.json</span> w <span class="mono">Pobrane/Downloads</span>.</li>
+        <li>Uruchom grę i kliknij „MOD” (lub naciśnij M), wybierz plik.</li>
+        <li>W sklepie (B) zobaczysz nowy koszt broni. HUD pokaże nazwę załadowanego moda.</li>
+      </ol>
+    </section>
+
+    <section>
+      <h2>Strona z modami</h2>
+      <p>Oficjalny link: <a href="https://dice-brawlmods/" target="_blank" rel="noopener">https://dice-brawlmods/</a></p>
+    </section>
+  </main>
+</body>
+</html>
