@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=People Playground (mini)
+Comment=Sandbox z fizyką (offline, otwiera lokalny plik HTML)
+Exec=/usr/bin/env bash -lc 'DIR=$(dirname "%k"); xdg-open "$DIR/www/index.html"'
+Terminal=false
+Categories=Game;Simulation;
